@@ -46,18 +46,26 @@ IPAddress ip(192,168,1,177);
 IPAddress server(184,106,153,149);
 //byte server[]  = { 184, 106, 153, 149 }; // IP Address for the ThingSpeak API
 String writeAPIKey = "7GH25707INIBKFUB";    // Write API Key for a ThingSpeak Channel - GlanworthThermo
-const int updateInterval = 30000;        // Time interval in milliseconds to update ThingSpeak   
+const int writeUpdateInterval = 90 * 1000;        // Time interval in milliseconds to update ThingSpeak
+const int readUpdateInterval = 11 * 1000;        // Time interval in milliseconds to read ThingSpeak
+boolean isRead = false;
+boolean capChar = false;
+String JSONResponse = "";
+int startChar = 0;
+int endChar = 0;
+String sSetTemp = "";
 EthernetClient client;
 
 // Variable Setup
-long lastConnectionTime = 0; 
+long lastWriteConnectionTime = 0;
+long lastReadConnectionTime = 0;
 boolean lastConnected = false;
 int resetCounter = 0;
 
 
 void setup()
 {
-//Serial.begin(9600);
+Serial.begin(9600);
 pinMode(boilerPowerPin, OUTPUT);
 pinMode(setPointDownPin, INPUT);
 pinMode(setPointUpPin, INPUT);
@@ -145,22 +153,57 @@ lcd.print(setTemp);
     if (client.available())
   {
     char c = client.read();
-   // Serial.print(c);
+    //Serial.print(c);
+     
+    if (c == '[') {
+        capChar = true;
+    }
+
+    if (capChar) JSONResponse += (c);
+
+    if (c == ']') {
+         capChar = false;
+    }
   }
   
 // Disconnect from ThingSpeak
   if (!client.connected() && lastConnected)
   {
     delay(1000);
+    if(isRead){
+     Serial.println("Response is:");
+    Serial.println(JSONResponse);
+    startChar = JSONResponse.indexOf("field2\":\"")+9;
+    endChar = startChar + 5;
+    sSetTemp = JSONResponse.substring(startChar, endChar);
+    char carray[sSetTemp.length() + 1]; //determine size of the array
+    sSetTemp.toCharArray(carray, sizeof(carray)); //put readStringinto an array
+    setTemp = atof(carray); //convert the array into an Float 
+    Serial.print("Set Temp: ");
+    Serial.println(setTemp);
+    Serial.println("...disconnected");
+    Serial.println();
+    JSONResponse = "";
+    isRead = false;
+    }
+    
+    
     client.stop();
   }
   
+// read set point
+if(!setPointLocalUpdate && !client.connected() && (millis() - lastReadConnectionTime > readUpdateInterval)){
+    readThingSpeak();
+    
+  }
+
+  
 // Update ThingSpeak
-  if(!client.connected() && (millis() - lastConnectionTime > updateInterval)){
+  if(!client.connected() && (millis() - lastWriteConnectionTime > writeUpdateInterval)){
     lcd.setCursor(0,1);
     lcd.print("UPDATING......");
     if(!setPointLocalUpdate){
-       updateThingSpeak("field1="+ String(currentTemp));
+       updateThingSpeak("field1="+ String(currentTemp) + "&field2="+ String(setTemp));
     } else {
         updateThingSpeak("field1="+ String(currentTemp) + "&field2="+ String(setTemp));
         setPointLocalUpdate = false;
@@ -198,7 +241,7 @@ void updateThingSpeak(String tsData)
     client.print("\n\n");
     client.print(tsData);
     
-    lastConnectionTime = millis();
+    lastWriteConnectionTime = millis();
     resetCounter = 0;
   } else {
       
@@ -209,7 +252,57 @@ void updateThingSpeak(String tsData)
         resetEthernetShield();
       }
   }  
-      lastConnectionTime = millis(); 
+      lastWriteConnectionTime = millis(); 
+}
+
+void readThingSpeak()
+{
+   if (client.connect(server, 80))
+  {         
+        
+    client.print("GET /channels/16469/feed.json?results=1 HTTP/1.1\n");
+    client.print("Host: api.thingspeak.com\n");
+    client.print("Connection: close\n");
+    client.print("X-THINGSPEAKAPIKEY: "+writeAPIKey+"\n");
+    client.print("Content-Type: application/xml\n");
+     client.print("\n\n");
+ 
+    lastReadConnectionTime = millis();
+    
+    if (client.connected())
+    {
+      Serial.println("Reading from ThingSpeak...");
+      Serial.println();
+      isRead = true;
+      
+      resetCounter = 0;
+    }
+    else
+    {
+      resetCounter++;
+  
+      Serial.println("Connection to ThingSpeak failed ("+String(resetCounter, DEC)+")");   
+      Serial.println();
+      if (resetCounter >=5 ) 
+      {
+        resetEthernetShield();
+      }
+    }
+    
+  }
+  else
+  {
+    resetCounter++;
+    
+    Serial.println("Connection to ThingSpeak Failed ("+String(resetCounter, DEC)+")");   
+    Serial.println();
+    if (resetCounter >=5 ) 
+      {
+        resetEthernetShield();
+      }
+    
+    lastReadConnectionTime = millis(); 
+  }
 }
 
 void resetEthernetShield()
