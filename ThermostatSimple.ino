@@ -65,11 +65,11 @@ int resetCounter = 0;
 
 void setup()
 {
-Serial.begin(9600);
-pinMode(boilerPowerPin, OUTPUT);
-pinMode(setPointDownPin, INPUT);
-pinMode(setPointUpPin, INPUT);
- // set up the LCD's number of columns and rows: 
+  Serial.begin(9600);
+  pinMode(boilerPowerPin, OUTPUT);
+  pinMode(setPointDownPin, INPUT);
+  pinMode(setPointUpPin, INPUT);
+  // set up the LCD's number of columns and rows: 
   lcd.begin(16, 2);
   // Print a message to the LCD.
   //lcd.print("hello, world!");
@@ -79,7 +79,7 @@ pinMode(setPointUpPin, INPUT);
   
    // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
- 
+  analogReference(INTERNAL);
 }
 
 //main loop
@@ -219,10 +219,11 @@ if(!setPointLocalUpdate && !client.connected() && (millis() - lastReadConnection
 float getTempCelcius(int pin)
 {
   int rawvoltage= analogRead(pin);
-  float millivolts= (rawvoltage/1024.0) * 5000;
+  //float millivolts= (rawvoltage/1024.0) * 5000;
+  float tempDegC = rawvoltage/9.31;
   
-  return millivolts/10;  
-  
+  //return millivolts/10;  
+  return tempDegC;
   
 }
 
