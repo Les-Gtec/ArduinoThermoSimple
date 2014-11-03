@@ -25,8 +25,8 @@ unsigned long timeOfLastButtonEventDown = 0;
 unsigned long timeOfLastTempCheck = 0;
 int tempCheckInterval = 2000;
 int heatCallCount = 5;
-float setTemp = 12.0;
-float currentTemp = 10.0;
+int setTemp = 12;
+int currentTemp = 10;
 boolean setPointLocalUpdate = false;
 float lastSentTemp = 10.0;
 
@@ -61,6 +61,9 @@ int resetCounter = 0;
 
 void setup()
 {
+  //Serial for debug
+  //Serial.begin(9600);
+
   //set up digital pins
   pinMode(boilerPowerPin, OUTPUT);
   pinMode(setPointDownPin, INPUT);
@@ -87,7 +90,7 @@ void loop()
   //Are we due a temperature check
   if(currentTime - timeOfLastTempCheck > tempCheckInterval){
     //Get temp and set resolution to 0.5 Degrees
-    currentTemp = (int)((getTempCelcius(tempSensorAPin)*2.0)+0.5)/2.0;
+    currentTemp = getTempCelcius(tempSensorAPin);
     timeOfLastTempCheck = currentTime;
   }
 
@@ -120,7 +123,7 @@ void loop()
     if (setPointUpCurrentState != setPointUpDebouncedState){
       setPointUpDebouncedState = setPointUpCurrentState;
       if (setPointUpDebouncedState == HIGH){
-        setTemp = setTemp+0.5;  
+        setTemp = setTemp+1;  
         setPointLocalUpdate = true;
       }
     }
@@ -136,7 +139,7 @@ void loop()
     if (setPointDownCurrentState != setPointDownDebouncedState){
       setPointDownDebouncedState = setPointDownCurrentState;
       if (setPointDownDebouncedState == HIGH){
-        setTemp = setTemp-0.5;  
+        setTemp = setTemp-1;  
         setPointLocalUpdate = true;
       }
     }
@@ -161,9 +164,11 @@ void loop()
     delay(1000);
     //If we read a set temp process it
     if(isRead){
+      //Serial.println("JSON: " + JSONResponse);
       startChar = JSONResponse.indexOf("field2\":\"")+9;
-      endChar = startChar + 5;
+      endChar = startChar + 2;
       sSetTemp = JSONResponse.substring(startChar, endChar);
+      //Serial.println("recieved temp: " + sSetTemp);
       char carray[sSetTemp.length() + 1]; //determine size of the array
       sSetTemp.toCharArray(carray, sizeof(carray)); //put readStringinto an array
       setTemp = atof(carray); //convert the array into an Float 
@@ -194,14 +199,18 @@ void loop()
 
   lastConnected = client.connected();
 
-}
+} 
 
-float getTempCelcius(int pin)
+int getTempCelcius(int pin)
 {
   int rawvoltage= analogRead(pin);
+  delay(100);
+  rawvoltage = analogRead(pin);
   //Uses 1.1v internal refernce
   float tempDegC = rawvoltage/9.31;
-  return tempDegC;  
+  //Adjust for sensor inacuracy
+  tempDegC = tempDegC - 2;
+  return (int)tempDegC;  
 }
 
 
