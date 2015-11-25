@@ -203,9 +203,15 @@ void loop()
 
 int getTempCelcius(int pin)
 {
+  int x=0;
+  unsigned long totRawVoltage = 0;
   int rawvoltage= analogRead(pin);
-  delay(100);
-  rawvoltage = analogRead(pin);
+  delay(60);
+  for(x = 0; x < 64; x++){
+    totRawVoltage += analogRead(pin);
+  }
+  rawvoltage = totRawVoltage >> 6;
+  //rawvoltage = analogRead(pin);
   //Uses 1.1v internal refernce
   float tempDegC = rawvoltage/9.31;
   //Adjust for sensor inacuracy
